@@ -337,7 +337,7 @@ var RESTSerializer = JSONSerializer.extend({
 
       /*jshint loopfunc:true*/
       forEach.call(payload[prop], function(hash) {
-        var typeName = this.typeForRoot(prop),
+        var typeName = this.typeForRoot(hash.type || prop),
             type = store.modelFor(typeName),
             typeSerializer = store.serializerFor(type);
 
@@ -467,32 +467,33 @@ var RESTSerializer = JSONSerializer.extend({
     payload = this.normalizePayload(payload);
 
     var primaryTypeName = primaryType.typeKey,
-        primaryArray;
+        primaryArray = Ember.A();
 
     for (var prop in payload) {
-      var typeKey = prop,
-          forcedSecondary = false;
+      var typeKey = prop;
 
       if (prop.charAt(0) === '_') {
-        forcedSecondary = true;
         typeKey = prop.substr(1);
       }
 
       var typeName = this.typeForRoot(typeKey),
-          type = store.modelFor(typeName),
-          typeSerializer = store.serializerFor(type),
-          isPrimary = (!forcedSecondary && (type.typeKey === primaryTypeName));
+          type = store.modelFor(typeName);
 
       /*jshint loopfunc:true*/
-      var normalizedArray = map.call(payload[prop], function(hash) {
-        return typeSerializer.normalize(type, hash, prop);
-      }, this);
+      forEach.call(payload[prop], function(hash) {
+        var typeName = this.typeForRoot(hash.type || typeKey),
+            type = store.modelFor(typeName),
+            typeSerializer = store.serializerFor(type),
+            record;
 
-      if (isPrimary) {
-        primaryArray = normalizedArray;
-      } else {
-        store.pushMany(typeName, normalizedArray);
-      }
+        record = typeSerializer.normalize(type, hash, prop);
+
+        if (type.typeKey !== primaryTypeName) {
+          store.push(typeName, record);
+        } else {
+          primaryArray.push(record);
+        }
+      }, this);
     }
 
     return primaryArray;
